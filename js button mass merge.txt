@@ -1,0 +1,62 @@
+var objectAPIName = "ChangeToYourObjAPIName"; 
+var oRecords = {!GETRECORDIDS($ObjectType.ChangeToYourObjAPIName)}; 
+{!REQUIRESCRIPT("/soap/ajax/36.0/connection.js")} 
+
+var url = parent.location.href; //string for the URL of the current page 
+var jRecords = []; 
+
+if (oRecords[0] == null) { //no record selected 
+alert("Please select at least one record."); 
+} 
+else 
+{ 
+var csvIds = ""; 
+for(var i in oRecords){ 
+csvIds += "'"+ oRecords[i] + "',"; 
+} 
+csvIds = csvIds.slice(0, csvIds.length - 1); 
+if(csvIds.length > 1){ 
+csvIds = "(" + csvIds + ")"; 
+} 
+
+var oResult = sforce.connection.query("select Name, Id from "+objectAPIName+" Where Id IN " +csvIds); 
+var records = oResult.getArray("records"); 
+for (var i=0; i< records.length; i++) 
+{ 
+var sdjob = new sforce.SObject("SDoc__SDJob__c"); 
+sdjob.SDoc__oId__c = records[i].Id; 
+sdjob.SDoc__objSortVal__c = records[i].Name; 
+sdjob.SDoc__runas__c = "{!$User.Username}"; 
+sdjob.SDoc__Status__c = "Selected"; 
+sdjob.SDoc__type__c = "Bulk Job - List View"; 
+sdjob.SDoc__objAPIName__c = objectAPIName; 
+jRecords.push(sdjob); 
+} 
+var result = sforce.connection.create(jRecords); 
+} 
+
+
+var errors = []; 
+if (result && result.length){ 
+var numFailed = 0; 
+var numSucceeded = 0; 
+for (var i = 0; i < result.length; i++){ 
+var res = result[i]; 
+if (res && res.success == 'true'){ 
+numSucceeded++; 
+} else { 
+var es = res.getArray("errors"); 
+if (es.length > 0) { 
+errors.push(es[0].message); 
+} 
+numFailed++; 
+} 
+} 
+if (numFailed > 0){ 
+alert("Failed: " + numFailed + "\nSucceeded: " + numSucceeded + " \n Due to: " + errors.join("\n")); 
+} else { 
+var sdresult = sforce.connection.query("SELECT count(Id) jCount FROM SDoc__SDJOB__c WHERE ownerid = '{!$User.Id}'"); 
+alert(numSucceeded + " Records Successfully Added.\n" +sdresult.records.jCount+" Total Records are now in your Mass Merge List."); 
+} 
+} 
+//window.location.reload();
